@@ -31,7 +31,7 @@ const { Console } = require('console');
 
 const Tray = electron.Tray;
 const iconPath = path.join(__dirname,'images/fav-icon.png');
-const versionItam = '1.0.1';
+const versionItam = '1.0.3';
 
 const chokidar = require('chokidar');
 const getmac = require('getmac');
@@ -2816,7 +2816,7 @@ autoUpdater.on('update-available', () => {
 autoUpdater.on('update-downloaded', () => {
   notifier.notify(
     {
-      title: 'Version 1.0.2 Released. Click to Restart Application.', //put version number of future release. not current.
+      title: 'Version 1.0.3 Released. Click to Restart Application.', //put version number of future release. not current.
       message: 'It will be Updated on Application Restart.',
       icon: path.join(app.getAppPath(), '/images/fav-icon.png'),
       sound: true,

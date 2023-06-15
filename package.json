@@ -1,19 +1,9 @@
 {
   "name": "YQ_9",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "To AutoUpdate in ITAM",
   "main": "main.js",
-  "windows": {
-    "uninstallDisplayName": "ABCOM",
-    "appUserModelId": "cicpl.matiba.wapp",
-    "disableWindowsConsumerFeatures": true
-  },
-  "windowsStoreConfig": {
-    "searchExclusionList": [
-      "*"
-    ],
-    "showNameOnTiles": false
-  },
+ 
   "scripts": {
     "start": "electron .",
     "deploy": "electron-builder build --win --publish always",
