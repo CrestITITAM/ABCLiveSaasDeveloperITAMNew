@@ -73,10 +73,12 @@
 
 ipcRenderer.send('get_company_logo');
 
-ipcRenderer.on('checked_company_logo', (event, data) => {
+ipcRenderer.on('checked_company_logo', (event, data,server_url) => {
   console.log(data);
+  console.log(server_url);
   if(data[0]){
-    document.getElementById("company_logo").src = 'https://business.eprompto.com/assets/backend//uploads/media/'+data[0];
+    document.getElementById("company_logo").src = server_url+'/assets/backend//uploads/media/'+data[0];
+    document.getElementById("clickable-region").href = server_url+'/account';
     // document.getElementById("company_logo").style.visibility = "visible";
   }
   if(data[1]){

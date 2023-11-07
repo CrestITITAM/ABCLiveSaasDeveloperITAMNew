@@ -31,7 +31,7 @@ const { Console } = require('console');
 
 const Tray = electron.Tray;
 const iconPath = path.join(__dirname,'images/fav-icon.png');
-const versionItam = '1.0.3';
+const versionItam = '1.0.6';
 
 const chokidar = require('chokidar');
 const getmac = require('getmac');
@@ -39,13 +39,18 @@ const getmac = require('getmac');
 //global.root_url = 'https://developer.eprompto.com/itam_backend_end_user';
 
 //global.root_url = 'http://localhost/business_eprompto/itam_backend_end_user';
-global.root_url = 'https://business.eprompto.com/itam_backend_end_user';
+//global.root_url = 'https://business.eprompto.com/itam_backend_end_user';
 // global.root_url = 'https://developer.eprompto.com/itam_backend_end_user';
 
 // global.root_url = 'http://localhost/end_user_backend';
 // global.root_url = 'http://localhost/eprompto_master';
 
+// global.root_url = 'https://developer.eprompto.com/itam_backend_end_user';
+// server_url = 'https://developer.eprompto.com';
 
+
+global.root_url = 'https://business.eprompto.com/itam_backend_end_user';
+server_url = 'https://business.eprompto.com';
 
 let reqPath = path.join(app.getAppPath(), '../');
 const detail =  reqPath+"syskey.txt";
@@ -205,36 +210,44 @@ function checkSecuritySelected(system_key){
           console.log(`STATUS: ${response.statusCode}`)
           response.on('data', (chunk) => {
             console.log(`${chunk}`);
-            var obj = JSON.parse(chunk);
-            console.log("Past checkSecuritySelected Json.parse chunk"); // comment
-            if(obj.status == 'valid'){
-              var asset_id = obj.asset_id;
-              var last_update = obj.last_date;
-              console.log("AT ACCESS"); // comment out
-               fs.access("C:/ITAMEssential", function(error) {
-                if (error) {
-                  console.log("AT MAKE DIR"); // comment out
-                  fs.mkdir("C:/ITAMEssential", function(err) {
-                    if (err) {
-                      console.log(err)
-                    } else {
-                      console.log("AT MAKE EVENTLOGCSV") // comment out
-                       fs.mkdir("C:/ITAMEssential/EventLogCSV", function(err) {
+            if (chunk) {
+              let a;
+              try {
+                var obj = JSON.parse(chunk);
+                console.log("Past checkSecuritySelected Json.parse chunk"); // comment
+                if(obj.status == 'valid'){
+                  var asset_id = obj.asset_id;
+                  var last_update = obj.last_date;
+                  console.log("AT ACCESS"); // comment out
+                  fs.access("C:/ITAMEssential", function(error) {
+                    if (error) {
+                      console.log("AT MAKE DIR"); // comment out
+                      fs.mkdir("C:/ITAMEssential", function(err) {
                         if (err) {
                           console.log(err)
                         } else {
-                          checkforbatchfile(last_update);
+                          console.log("AT MAKE EVENTLOGCSV") // comment out
+                          fs.mkdir("C:/ITAMEssential/EventLogCSV", function(err) {
+                            if (err) {
+                              console.log(err)
+                            } else {
+                              checkforbatchfile(last_update);
+                            }
+                          })
                         }
                       })
+                    } else {
+                      checkforbatchfile(last_update);
                     }
                   })
-                } else {
-                  checkforbatchfile(last_update);
-                }
-              })
 
-              fetchEventlogData(asset_id,system_key,last_update); 
-            }
+                  fetchEventlogData(asset_id,system_key,last_update); 
+                }
+                
+              } catch (e) {
+                  return console.log('checkSecuritySelected: No proper response received'); // error in the above string (in this case, yes)!
+              }
+             } 
           })
           response.on('end', () => {})
       })
@@ -314,88 +327,97 @@ function fetchEventlogData(assetid,system_key,last_update){
             //console.log(`STATUS: ${response.statusCode}`)
             response.on('data', (chunk) => {
               //console.log(`${chunk}`);
-              var obj = JSON.parse(chunk);
-              if(obj.status == 'valid'){
-                security_crontime_array = obj.result; 
-                security_crontime_array.forEach(function(slot){ 
-                   cron.schedule("0 "+slot[1]+" "+slot[0]+" * * *", function() { 
-                      session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
-                        .then((cookies) => {
-                          if(cookies.length > 0){
+              if (chunk) {
+                let a;
+                try {
+                  var obj = JSON.parse(chunk);
+                  if(obj.status == 'valid'){
+                    security_crontime_array = obj.result; 
+                    security_crontime_array.forEach(function(slot){ 
+                      cron.schedule("0 "+slot[1]+" "+slot[0]+" * * *", function() { 
+                          session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+                            .then((cookies) => {
+                              if(cookies.length > 0){
 
-                             child_process.exec('C:\\ITAMEssential\\logadmin', function(error, stdout, stderr) {
-                                  console.log(stdout);
-                              });
-                          
-                            getEventIds('System',assetid,function(events){
-                              var command = '$aDateTime = [dateTime]"'+last_update+'"'+'\n'+'Get-EventLog -LogName System -InstanceId '+events+' -After ($aDateTime) -Before (Get-Date)  | Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\systemlog.csv';
-                              //var command = 'Get-EventLog -LogName System -InstanceId '+events+' -After ([datetime]::Today)| Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\systemlog.csv';
-                              exec(command, {'shell':'powershell.exe'}, (error, stdout, stderr)=> {
-                                  console.log(stdout);
-                              })
-                            });
+                                child_process.exec('C:\\ITAMEssential\\logadmin', function(error, stdout, stderr) {
+                                      console.log(stdout);
+                                  });
+                              
+                                getEventIds('System',assetid,function(events){
+                                  var command = '$aDateTime = [dateTime]"'+last_update+'"'+'\n'+'Get-EventLog -LogName System -InstanceId '+events+' -After ($aDateTime) -Before (Get-Date)  | Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\systemlog.csv';
+                                  //var command = 'Get-EventLog -LogName System -InstanceId '+events+' -After ([datetime]::Today)| Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\systemlog.csv';
+                                  exec(command, {'shell':'powershell.exe'}, (error, stdout, stderr)=> {
+                                      console.log(stdout);
+                                  })
+                                });
 
-                            getEventIds('Application',assetid,function(events){
-                              var command = '$aDateTime = [dateTime]"'+last_update+'"'+'\n'+'Get-EventLog -LogName Application -InstanceId '+events+' -After ($aDateTime) -Before (Get-Date)  | Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\applog.csv';
-                              //var command = 'Get-EventLog -LogName Application -InstanceId '+events+' -After ([datetime]::Today)| Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\applog.csv';
-                              exec(command, {'shell':'powershell.exe'}, (error, stdout, stderr)=> {
-                                  console.log(stdout);
-                              })
-                            });
-                          }
-                        }).catch((error) => {
-                          console.log(error)
-                        })
-                       }, {
-                         scheduled: true,
-                         timezone: "Asia/Kolkata" 
+                                getEventIds('Application',assetid,function(events){
+                                  var command = '$aDateTime = [dateTime]"'+last_update+'"'+'\n'+'Get-EventLog -LogName Application -InstanceId '+events+' -After ($aDateTime) -Before (Get-Date)  | Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\applog.csv';
+                                  //var command = 'Get-EventLog -LogName Application -InstanceId '+events+' -After ([datetime]::Today)| Export-Csv -Path C:\\ITAMEssential\\EventLogCSV\\applog.csv';
+                                  exec(command, {'shell':'powershell.exe'}, (error, stdout, stderr)=> {
+                                      console.log(stdout);
+                                  })
+                                });
+                              }
+                            }).catch((error) => {
+                              console.log(error)
+                            })
+                          }, {
+                            scheduled: true,
+                            timezone: "Asia/Kolkata" 
+                        });
+                      
+
+                        var minute = Number(slot[1])+Number(4); 
+                        if(minute > 59){
+                          slot[0] = Number(slot[0])+Number(1);
+                          minute = Number(minute) - Number(60);
+                        }
+
+                        cron.schedule("0 "+minute+" "+slot[0]+" * * *", function() { 
+                          session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+                            .then((cookies) => {
+                              if(cookies.length > 0){
+                                //read from csv
+                                  try {
+                                    if (fs.existsSync('C:/ITAMEssential/EventLogCSV/securitylog.csv')) {
+                                      readSecurityCSVFile('C:\\ITAMEssential\\EventLogCSV\\securitylog.csv',system_key);
+                                    }
+                                  } catch(err) {
+                                    console.error(err)
+                                  }
+
+                                  try {
+                                    if (fs.existsSync('C:/ITAMEssential/EventLogCSV/systemlog.csv')) {
+                                      readCSVFile('C:\\ITAMEssential\\EventLogCSV\\systemlog.csv',system_key);
+                                    }
+                                  } catch(err) {
+                                    console.error(err)
+                                  }
+
+                                  try {
+                                    if (fs.existsSync('C:/ITAMEssential/EventLogCSV/applog.csv')) {
+                                      readCSVFile('C:\\ITAMEssential\\EventLogCSV\\applog.csv',system_key);
+                                    }
+                                  } catch(err) {
+                                    console.error(err)
+                                  }
+                              }
+                            }).catch((error) => {
+                              console.log(error)
+                            })
+                          }, {
+                            scheduled: true,
+                            timezone: "Asia/Kolkata" 
+                        });
                     });
-                   
-
-                    var minute = Number(slot[1])+Number(4); 
-                    if(minute > 59){
-                      slot[0] = Number(slot[0])+Number(1);
-                      minute = Number(minute) - Number(60);
-                    }
-
-                    cron.schedule("0 "+minute+" "+slot[0]+" * * *", function() { 
-                      session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
-                        .then((cookies) => {
-                          if(cookies.length > 0){
-                            //read from csv
-                              try {
-                                if (fs.existsSync('C:/ITAMEssential/EventLogCSV/securitylog.csv')) {
-                                  readSecurityCSVFile('C:\\ITAMEssential\\EventLogCSV\\securitylog.csv',system_key);
-                                }
-                              } catch(err) {
-                                console.error(err)
-                              }
-
-                              try {
-                                if (fs.existsSync('C:/ITAMEssential/EventLogCSV/systemlog.csv')) {
-                                  readCSVFile('C:\\ITAMEssential\\EventLogCSV\\systemlog.csv',system_key);
-                                }
-                              } catch(err) {
-                                console.error(err)
-                              }
-
-                              try {
-                                if (fs.existsSync('C:/ITAMEssential/EventLogCSV/applog.csv')) {
-                                  readCSVFile('C:\\ITAMEssential\\EventLogCSV\\applog.csv',system_key);
-                                }
-                              } catch(err) {
-                                console.error(err)
-                              }
-                          }
-                        }).catch((error) => {
-                          console.log(error)
-                        })
-                       }, {
-                         scheduled: true,
-                         timezone: "Asia/Kolkata" 
-                    });
-                });
-              }
+                  }
+                  
+                  
+                } catch (e) {
+                    return console.log('getSecurityCrontime: No proper response received'); // error in the above string (in this case, yes)!
+                }
+               } 
             })
             response.on('end', () => {})
         })
@@ -514,16 +536,25 @@ var getEventIds = function(logname,asset_id,callback) {
           //console.log(`STATUS: ${response.statusCode}`)
           response.on('data', (chunk) => {
             //console.log(`${chunk}`);
-            var obj = JSON.parse(chunk);
-            if(obj.status == 'valid'){
-              if(obj.result.length > 0){
-                for (var i = 0; i < obj.result.length-1 ; i++) {
-                  events = events + obj.result[i]+',';
+            
+            if (chunk) {
+              let a;
+              try {
+                var obj = JSON.parse(chunk);
+                if(obj.status == 'valid'){
+                  if(obj.result.length > 0){
+                    for (var i = 0; i < obj.result.length-1 ; i++) {
+                      events = events + obj.result[i]+',';
+                    }
+                    events = events + obj.result[obj.result.length-1];
+                  }
+                  callback(events);
                 }
-                events = events + obj.result[obj.result.length-1];
+                
+              } catch (e) {
+                  return console.log('getEventId: No proper response received'); // error in the above string (in this case, yes)!
               }
-              callback(events);
-            }
+             } 
           })
           response.on('end', () => {})
       })
@@ -548,26 +579,34 @@ function SetCron(sysKey){
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
        console.log("ITAM CRON TIME IS"+`${chunk}`);
-        var obj = JSON.parse(chunk);
-        if(obj.status == 'valid'){
-          crontime_array = obj.result;
-          crontime_array.forEach(function(slot){ 
-            cron.schedule("0 "+slot[0]+" "+slot[1]+" * * *", function() { 
-            session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
-              .then((cookies) => {
-                if(cookies.length > 0){
-                  slot_time = slot[1]+':'+slot[0];
-                  updateAssetUtilisation(slot_time);
-                }
-              }).catch((error) => {
-                console.log(error)
-              })
-             }, {
-               scheduled: true,
-               timezone: "Asia/Kolkata" 
-          });
-          });
-        }
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            if(obj.status == 'valid'){
+              crontime_array = obj.result;
+              crontime_array.forEach(function(slot){ 
+                cron.schedule("0 "+slot[0]+" "+slot[1]+" * * *", function() { 
+                session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+                  .then((cookies) => {
+                    if(cookies.length > 0){
+                      slot_time = slot[1]+':'+slot[0];
+                      updateAssetUtilisation(slot_time);
+                    }
+                  }).catch((error) => {
+                    console.log(error)
+                  })
+                }, {
+                  scheduled: true,
+                  timezone: "Asia/Kolkata" 
+              });
+              });
+            }
+                  
+          } catch (e) {
+              return console.log('crontime: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -611,23 +650,37 @@ function setGlobalVariable(){
               //console.log(`STATUS: ${response.statusCode}`)
               response.on('data', (chunk) => { 
                 //console.log(`${chunk}`); 
-                var obj = JSON.parse(chunk);
-                if(obj.status == 'valid'){
-                  asset_id = obj.result[0];
-                  client_id = obj.result[1];
-                  global.clientID = client_id;
-                  global.NetworkStatus = 'Yes';
-                  global.downloadURL = __dirname;
-                  global.assetID = asset_id;
-                  global.deviceID = obj.result[2];
-                  global.userName = obj.loginPass[0];
-                  global.loginid = obj.loginPass[1];
-                  global.sysKey = cookies[0].name;
-                  updateAsset(asset_id);
-
-                  //SetCron(cookies[0].name);
-                  //addAssetUtilisation(asset_id,client_id);
-                }
+                if (chunk) {
+                  let a;
+                  try {
+                    var obj = JSON.parse(chunk);
+                    if(obj.status == 'valid'){
+                      asset_id = obj.result[0];
+                      client_id = obj.result[1];
+                      global.clientID = client_id;
+                      global.NetworkStatus = 'Yes';
+                      global.downloadURL = __dirname;
+                      global.assetID = asset_id;
+                      global.deviceID = obj.result[2];
+                      global.userName = obj.loginPass[0];
+                      global.loginid = obj.loginPass[1];
+                      global.sysKey = cookies[0].name;
+                     // updateAsset(asset_id);
+                      softwareDetails();
+                      hardwareDetails();
+                      keyboardDetails();
+                      mouseDetails();
+                      graphicCardDetails();
+                      motherboardDetails();
+                      monitorDetails();
+                      //SetCron(cookies[0].name);
+                      //addAssetUtilisation(asset_id,client_id);
+                    }
+                    
+                  } catch (e) {
+                      return console.log('openFunc: No proper response received'); // error in the above string (in this case, yes)!
+                  }
+                 } 
               })
               response.on('end', () => {})
           })
@@ -862,12 +915,21 @@ function CallUpdateAssetApi(sys_key,todays_date,slot,cpu_used,ram_used,hdd_used,
               //console.log(`STATUS: ${response.statusCode}`)
               response.on('data', (chunk) => {
                 console.log(`${chunk}`);
-                var obj = JSON.parse(chunk);
-                if(obj.status == 'invalid'){ 
-                  log.info('Error while updating asset detail 1');
-                }else{
-                  log.info('Updated asset detail successfully 1');
-                }
+                
+                if (chunk) {
+                  let a;
+                  try {
+                    var obj = JSON.parse(chunk);
+                    if(obj.status == 'invalid'){ 
+                      log.info('Error while updating asset detail 1');
+                    }else{
+                      log.info('Updated asset detail successfully 1');
+                    }
+                    
+                  } catch (e) {
+                      return console.log('addassetUtilisation: No proper response received'); // error in the above string (in this case, yes)!
+                  }
+                 } 
               })
               response.on('end', () => {
                 // if (newFilePath != "" ){ // if filepath has been passed and uploading done
@@ -895,12 +957,20 @@ function CallUpdateAssetApi(sys_key,todays_date,slot,cpu_used,ram_used,hdd_used,
         //console.log(`STATUS: ${response.statusCode}`)
         response.on('data', (chunk) => {
           //console.log(`${chunk}`);
-          var obj = JSON.parse(chunk);
-          if(obj.status == 'invalid'){ 
-            log.info('Error while updating asset detail 2');
-          }else{
-            log.info('Updated asset detail successfully 2');
-          }
+         if (chunk) {
+            let a;
+            try {
+              var obj = JSON.parse(chunk);
+              if(obj.status == 'invalid'){ 
+                log.info('Error while updating asset detail 2');
+              }else{
+                log.info('Updated asset detail successfully 2');
+              }
+              
+            } catch (e) {
+                return console.log('addassetUtilisation: No proper response received'); // error in the above string (in this case, yes)!
+            }
+           } 
         })
         response.on('end', () => {})
     })
@@ -1100,10 +1170,18 @@ function readCSVUtilisation(){
                 //console.log(`STATUS: ${response.statusCode}`)
                 response.on('data', (chunk) => {
                   //console.log(`${chunk}`);
-                  var obj = JSON.parse(chunk);
-                  if(obj.status == 'valid'){
-                    log.info('Successfully inserted data to database');
-                  }
+                  if (chunk) {
+                    let a;
+                    try {
+                      var obj = JSON.parse(chunk);
+                      if(obj.status == 'valid'){
+                        log.info('Successfully inserted data to database');
+                      }
+                      
+                    } catch (e) {
+                        return console.log('fetchfromCSV: No proper response received'); // error in the above string (in this case, yes)!
+                    }
+                   } 
                 })
                 response.on('end', () => {})
             })
@@ -1517,36 +1595,45 @@ ipcMain.on("download", (event, info) => {
               //console.log(`STATUS: ${response.statusCode}`)
               response.on('data', (chunk) => {
                 //console.log(`${chunk}`);
-                var obj = JSON.parse(chunk);
-                if(obj.status == 'valid'){
-                  data = obj.result;
-                  output_one = ['Date,Slot Time,Total Ram(GB),Total HDD(GB),HDD Name,CPU(%),RAM(%),HDD(GB),App'];
-                
-                  data.forEach((d) => {
-                    output_one.push(d[0]);
-                      d['detail'].forEach((dd) => {
-                        output_one.push(dd.join()); // by default, join() uses a ','
-                      });
-                    });
-                
-                  fs.writeFileSync(filename, output_one.join(os.EOL));
-                    var datetime = new Date();
-                    datetime = datetime.toISOString().slice(0,10);
-
-                    var oldPath = reqPath + '/output.csv';
-                    require_path = 'C:/Users/'+ os.userInfo().username +'/Downloads';
-                 
-                    if (!fs.existsSync(require_path)){
-                        fs.mkdirSync(require_path);
-                    } 
-
-                    var newPath = 'C:/Users/'+ os.userInfo().username +'/Downloads/perfomance_report_of_'+os.hostname()+'_'+datetime+'.csv';
-                    mv(oldPath, newPath, err => {
-                        if (err) return console.error(err);
-                        console.log('success!');
-                        console.log(alert_message);
-                    });
-                }
+                if (chunk) 
+                {
+                  let a;
+                  try {
+                    var obj = JSON.parse(chunk);
+                    if(obj.status == 'valid'){
+                      data = obj.result;
+                      output_one = ['Date,Slot Time,Total Ram(GB),Total HDD(GB),HDD Name,CPU(%),RAM(%),HDD(GB),App'];
+                    
+                      data.forEach((d) => {
+                        output_one.push(d[0]);
+                          d['detail'].forEach((dd) => {
+                            output_one.push(dd.join()); // by default, join() uses a ','
+                          });
+                        });
+                    
+                      fs.writeFileSync(filename, output_one.join(os.EOL));
+                        var datetime = new Date();
+                        datetime = datetime.toISOString().slice(0,10);
+    
+                        var oldPath = reqPath + '/output.csv';
+                        require_path = 'C:/Users/'+ os.userInfo().username +'/Downloads';
+                     
+                        if (!fs.existsSync(require_path)){
+                            fs.mkdirSync(require_path);
+                        } 
+    
+                        var newPath = 'C:/Users/'+ os.userInfo().username +'/Downloads/perfomance_report_of_'+os.hostname()+'_'+datetime+'.csv';
+                        mv(oldPath, newPath, err => {
+                            if (err) return console.error(err);
+                            console.log('success!');
+                            console.log(alert_message);
+                        });
+                    }
+                    
+                  } catch (e) {
+                      return console.log('cpuDetail: No proper response received'); // error in the above string (in this case, yes)!
+                  }
+                 } 
               })
               response.on('end', () => {})
           })
@@ -1568,32 +1655,40 @@ ipcMain.on("download", (event, info) => {
                 //console.log(`STATUS: ${response.statusCode}`)
                 response.on('data', (chunk) => {
                   //console.log(`${chunk}`);
-                  var obj = JSON.parse(chunk);
-                  if(obj.status == 'valid'){
-                    data = obj.result;
-                    output_one = ['Date,Detail']; 
-                    data.forEach((d) => {
-                         output_one.push(d.join()); // by default, join() uses a ','
-                      });
-                  
-                    fs.writeFileSync(filename, output_one.join(os.EOL));
-                      var datetime = new Date();
-                      datetime = datetime.toISOString().slice(0,10);
+                  if (chunk) {
+                    let a;
+                    try {
+                      var obj = JSON.parse(chunk);
+                      if(obj.status == 'valid'){
+                        data = obj.result;
+                        output_one = ['Date,Detail']; 
+                        data.forEach((d) => {
+                            output_one.push(d.join()); // by default, join() uses a ','
+                          });
+                      
+                        fs.writeFileSync(filename, output_one.join(os.EOL));
+                          var datetime = new Date();
+                          datetime = datetime.toISOString().slice(0,10);
 
-                      var oldPath = reqPath + '/app_output.csv';
-                      require_path = 'C:/Users/'+ os.userInfo().username +'/Downloads';
-                   
-                    if (!fs.existsSync(require_path)){
-                        fs.mkdirSync(require_path);
-                    } 
+                          var oldPath = reqPath + '/app_output.csv';
+                          require_path = 'C:/Users/'+ os.userInfo().username +'/Downloads';
+                      
+                        if (!fs.existsSync(require_path)){
+                            fs.mkdirSync(require_path);
+                        } 
 
-                      var newPath = 'C:/Users/'+ os.userInfo().username +'/Downloads/app_used_report_of_'+os.hostname()+'_'+datetime+'.csv';
-                      mv(oldPath, newPath, err => {
-                          if (err) return console.error(err);
-                          console.log('success!');
-                          console.log(alert_message);
-                      });
-                  }
+                          var newPath = 'C:/Users/'+ os.userInfo().username +'/Downloads/app_used_report_of_'+os.hostname()+'_'+datetime+'.csv';
+                          mv(oldPath, newPath, err => {
+                              if (err) return console.error(err);
+                              console.log('success!');
+                              console.log(alert_message);
+                          });
+                      }
+                      
+                    } catch (e) {
+                        return console.log('appDetail: No proper response received'); // error in the above string (in this case, yes)!
+                    }
+                   } 
                 })
                 response.on('end', () => {})
             })
@@ -1660,12 +1755,20 @@ ipcMain.on('tabData',function(e,form_data){
               //console.log(`STATUS: ${response.statusCode}`)
               response.on('data', (chunk) => {
                 //console.log(`${chunk}`);
-                var obj = JSON.parse(chunk);
-                if(obj.status == 'valid'){
-                  e.reply('tabTicketReturn', obj.result) ;
-                }else if(obj.status == 'invalid'){
-                  e.reply('tabTicketReturn', obj.result) ;
-                }
+                if (chunk) {
+                  let a;
+                  try {
+                    var obj = JSON.parse(chunk);
+                    if(obj.status == 'valid'){
+                      e.reply('tabTicketReturn', obj.result) ;
+                    }else if(obj.status == 'invalid'){
+                      e.reply('tabTicketReturn', obj.result) ;
+                    }
+                    
+                  } catch (e) {
+                      return console.log('ticketDetail: No proper response received'); // error in the above string (in this case, yes)!
+                  }
+                 } 
               })
               response.on('end', () => {})
           })
@@ -1689,15 +1792,22 @@ ipcMain.on('tabData',function(e,form_data){
                 // console.log(chunk);
                 // console.log(`${chunk}`);
                 // console.log(chunk.toString('utf8'));
-                var obj = JSON.parse(chunk);
-                
-                 if(obj.status == 'valid'){
-                  // console.log(obj);
-                   e.reply('tabTaskReturn',obj.result);
-                 }
-                 else if(obj.status == 'invalid'){
-                  e.reply('tabTaskReturn', obj.result) ;
+               if (chunk) {
+                let a;
+                try {
+                  var obj = JSON.parse(chunk);
+                  if(obj.status == 'valid'){
+                    // console.log(obj);
+                     e.reply('tabTaskReturn',obj.result);
+                   }
+                   else if(obj.status == 'invalid'){
+                    e.reply('tabTaskReturn', obj.result) ;
+                  }
+                  
+                } catch (e) {
+                    return console.log('TaskManagerTable: No proper response received'); // error in the above string (in this case, yes)!
                 }
+               } 
               })
               response.on('end', () => {})
           })
@@ -1718,10 +1828,18 @@ ipcMain.on('tabData',function(e,form_data){
               //console.log(`STATUS: ${response.statusCode}`)
               response.on('data', (chunk) => {
                 //console.log(`${chunk}`);
-                var obj = JSON.parse(chunk);
-                 if(obj.status == 'valid'){
-                   e.reply('tabAssetReturn', obj.result[0]) ;
-                 }
+                if (chunk) {
+                  let a;
+                  try {
+                    var obj = JSON.parse(chunk);
+                    if(obj.status == 'valid'){
+                      e.reply('tabAssetReturn', obj.result[0]) ;
+                    }
+                    
+                  } catch (e) {
+                      return console.log('assetDetail: No proper response received'); // error in the above string (in this case, yes)!
+                  }
+                 } 
               })
               response.on('end', () => {})
           })
@@ -1743,18 +1861,26 @@ ipcMain.on('tabData',function(e,form_data){
               //console.log(`STATUS: ${response.statusCode}`)
               response.on('data', (chunk) => {
                 //console.log(`${chunk}`);
-                var obj = JSON.parse(chunk);
-                 if(obj.status == 'valid'){
-                   if(obj.result[0][2] == ''){
-                      obj.result[0][2] = 'Not Available';
+                 if (chunk) {
+                  let a;
+                  try {
+                    var obj = JSON.parse(chunk);
+                    if(obj.status == 'valid'){
+                      if(obj.result[0][2] == ''){
+                         obj.result[0][2] = 'Not Available';
+                       }
+   
+                       if(obj.result[0][3] == ''){
+                         obj.result[0][3] = 'Not Available';
+                       }
+   
+                     e.reply('tabUserReturn', obj.result[0]);
                     }
-
-                    if(obj.result[0][3] == ''){
-                      obj.result[0][3] = 'Not Available';
-                    }
-
-                  e.reply('tabUserReturn', obj.result[0]);
-                 }
+                    
+                  } catch (e) {
+                      return console.log('userDetail: No proper response received'); // error in the above string (in this case, yes)!
+                  }
+                 } 
               })
               response.on('end', () => {})
           })
@@ -1819,7 +1945,7 @@ ipcMain.on('tabData',function(e,form_data){
                  hdd_total = hdd_total + disk.blocks;
                  hdd_used = hdd_used + disk.used;
                  used_drive = (disk.used/(1024*1024*1024)).toFixed(2); 
-                 hdd_name = hdd_name.concat(disk.mounted+' '+used_drive+'  GB/ ');
+                 hdd_name = hdd_name.concat(disk.mounted+' '+used_drive+' GB <br>');
              }
                 
           }
@@ -1928,19 +2054,28 @@ ipcMain.on('form_data',function(e,form_data){
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
         //console.log(`${chunk}`);
-        var obj = JSON.parse(chunk);
-        var result = [];
-        if(obj.status == 'valid'){
-          global.ticketNo = obj.ticket_no;
-          result['status'] = 1;
-          result['ticketNo'] = ticketNo;
-          e.reply('ticket_submit',result);
-        }else{
-          result['status'] = 0;
-          result['ticketNo'] = '';
-          e.reply('ticket_submit',result);
-          
-        }
+       if (chunk) {
+                let a;
+                try {
+                  var obj = JSON.parse(chunk);
+                  var result = [];
+                  if(obj.status == 'valid'){
+                    global.ticketNo = obj.ticket_no;
+                    result['status'] = 1;
+                    result['ticketNo'] = ticketNo;
+                    e.reply('ticket_submit',result);
+                  }else{
+                    result['status'] = 0;
+                    result['ticketNo'] = '';
+                    e.reply('ticket_submit',result);
+                    
+                  }
+                  
+                } catch (e) {
+                    return console.log('ticketInsert: No proper response received'); // error in the above string (in this case, yes)!
+                }
+               } 
+
       })
       response.on('end', () => {})
   })
@@ -1964,10 +2099,18 @@ ipcMain.on('getUsername',function(e,form_data){
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => { 
         //console.log(`${chunk}`);
-         var obj = JSON.parse(chunk);
-         if(obj.status == 'valid'){
-           e.reply('returnUsername', obj.result) ;
-         }
+       if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            if(obj.status == 'valid'){
+              e.reply('returnUsername', obj.result) ;
+            }
+            
+          } catch (e) {
+              return console.log('getusername: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2063,11 +2206,20 @@ console.log('getSystemKey Main');
   request.on('response', (response) => {
       console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
-        var obj = JSON.parse(chunk);
-        console.log(obj.sys_key);
-        if(obj.sys_key != '' || obj.sys_key != null){
-          e.reply('setSysKey', obj.sys_key);
-        }
+       
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            console.log(obj.sys_key);
+            if(obj.sys_key != '' || obj.sys_key != null){
+              e.reply('setSysKey', obj.sys_key);
+            }
+            
+          } catch (e) {
+              return console.log('getSysKey: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2092,13 +2244,21 @@ ipcMain.on('loadAllocUser',function(e,data){
    // console.log(response);
       console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
-        var obj = JSON.parse(chunk);
-        console.log(obj);
-        if(obj.status == 'valid'){
-          e.reply('setAllocUser', obj.result);
-        }else{
-          e.reply('setAllocUser', '');
-        }
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            console.log(obj);
+            if(obj.status == 'valid'){
+              e.reply('setAllocUser', obj.result);
+            }else{
+              e.reply('setAllocUser', '');
+            }
+            
+          } catch (e) {
+              return console.log('getAllocUser: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2149,111 +2309,126 @@ ipcMain.on('login_data',function(e,data){
         //console.log(`STATUS: ${response.statusCode}`)
         response.on('data', (chunk) => {
           console.log(`${chunk}`);
-          var obj = JSON.parse(chunk);
-          console.log(obj);
-          // console.log('Hiiiiiiiiiiiiiiiiiiiiiiii');
-          // console.log(obj.result);
-          // console.log(obj.loginPass[0]);
-          if(obj.status == 'valid'){
-            const cookie = {url: 'http://www.eprompto.com', name: data.system_key, value: data.system_key, expirationDate:9999999999 }
-            session.defaultSession.cookies.set(cookie, (error) => {
-              if (error) console.error(error)
-            })
+          if (chunk) {
+            let a;
+            try {
+              var obj = JSON.parse(chunk);
+              console.log(obj);
+              // console.log('Hiiiiiiiiiiiiiiiiiiiiiiii');
+              // console.log(obj.result);
+              // console.log(obj.loginPass[0]);
+              if(obj.status == 'valid'){
+                const cookie = {url: 'http://www.eprompto.com', name: data.system_key, value: data.system_key, expirationDate:9999999999 }
+                session.defaultSession.cookies.set(cookie, (error) => {
+                  if (error) console.error(error)
+                })
 
-            fs.writeFile(detail, data.system_key, function (err) {
-              if (err) return console.log(err);
-            });
+                fs.writeFile(detail, data.system_key, function (err) {
+                  if (err) return console.log(err);
+                });
 
-            global.clientID = obj.result;
-            global.userName = obj.loginPass[0];
-            global.loginid = obj.loginPass[1];
-            asset_id = obj.asset_maxid;
-            updateAsset(asset_id);
-            //addAssetUtilisation(output.asset_maxid,output.result[0]);
-            global.deviceID = data.device_type;
-   
-            mainWindow = new BrowserWindow({
-              width: 392,
-              height: 520,
-              icon: __dirname + '/images/fav-icon.png',
-              frame: false,
-              x: width - 450,
-                y: 190,
-              webPreferences: {
-                    nodeIntegration: true,
-                    enableRemoteModule: true,
-                },
-               // skipTaskbar: true  
-            });
-          // mainWindow.hide();
-            mainWindow.setMenuBarVisibility(false);
-           
-           
-             
-            mainWindow.loadURL(url.format({
-              pathname: path.join(__dirname,'index.html'),
-              protocol: 'file:',
-              slashes: true
-            }));
-
-            // child = new BrowserWindow({ 
-            //   parent: mainWindow,
-            //   icon: __dirname + '/images/fav-icon.png', 
-            //   modal: true, 
-            //   show: true,
-            //   width: 370,
-            //   height: 100,
-            //   frame: false,
-            //   x: width - 450,
-            //       y: 190,
-            //   webPreferences: {
-            //           nodeIntegration: true,
-            //           enableRemoteModule: true,
-            //       }
-            // });
-
-            // child.setMenuBarVisibility(false);
-
-            // child.loadURL(url.format({
-            //   pathname: path.join(__dirname,'modal.html'),
-            //   protocol: 'file:',
-            //   slashes: true
-            // }));
-            child.once('ready-to-show', () => {
-              child.show()
-            });
-
+                global.clientID = obj.result;
+                global.userName = obj.loginPass[0];
+                global.loginid = obj.loginPass[1];
+                asset_id = obj.asset_maxid;
+                //updateAsset(asset_id);
+                softwareDetails();
+                hardwareDetails();
+                keyboardDetails();
+                mouseDetails();
+                graphicCardDetails();
+                motherboardDetails();
+                monitorDetails();
+                //addAssetUtilisation(output.asset_maxid,output.result[0]);
+                global.deviceID = data.device_type;
+      
+                mainWindow = new BrowserWindow({
+                  width: 392,
+                  height: 520,
+                  icon: __dirname + '/images/fav-icon.png',
+                  frame: false,
+                  x: width - 450,
+                    y: 190,
+                  webPreferences: {
+                        nodeIntegration: true,
+                        enableRemoteModule: true,
+                    },
+                  // skipTaskbar: true  
+                });
+              // mainWindow.hide();
+                mainWindow.setMenuBarVisibility(false);
               
-            startWindow.close();
-            // loginWindow.on('close', function (e) {
-            //   loginWindow = null;
-            // });
+              
+                
+                mainWindow.loadURL(url.format({
+                  pathname: path.join(__dirname,'index.html'),
+                  protocol: 'file:',
+                  slashes: true
+                }));
 
-            tray.on('click', function(e){
-                if (mainWindow.isVisible()) {
-                  mainWindow.hide();
+                // child = new BrowserWindow({ 
+                //   parent: mainWindow,
+                //   icon: __dirname + '/images/fav-icon.png', 
+                //   modal: true, 
+                //   show: true,
+                //   width: 370,
+                //   height: 100,
+                //   frame: false,
+                //   x: width - 450,
+                //       y: 190,
+                //   webPreferences: {
+                //           nodeIntegration: true,
+                //           enableRemoteModule: true,
+                //       }
+                // });
+
+                // child.setMenuBarVisibility(false);
+
+                // child.loadURL(url.format({
+                //   pathname: path.join(__dirname,'modal.html'),
+                //   protocol: 'file:',
+                //   slashes: true
+                // }));
+                child.once('ready-to-show', () => {
+                  child.show()
+                });
+
                   
-                } else {
-                  mainWindow.hide();
-                 
+                startWindow.close();
+                // loginWindow.on('close', function (e) {
+                //   loginWindow = null;
+                // });
+
+                tray.on('click', function(e){
+                    if (mainWindow.isVisible()) {
+                      mainWindow.hide();
+                      
+                    } else {
+                      mainWindow.hide();
+                    
+                    }
+                });
+                
+                mainWindow.on('close', function (e) {
+                if (process.platform !== "darwin") {
+                  app.quit();
                 }
-            });
-            
-            mainWindow.on('close', function (e) {
-            if (process.platform !== "darwin") {
-              app.quit();
+                // // if (electron.app.isQuitting) {
+                // //  return
+                // // }
+                // e.preventDefault()
+                // mainWindow.hide()
+                // // if (child.isVisible()) {
+                // //     child.hide()
+                // //   } 
+                // //mainWindow = null;
+              });
+              }
+              
+            } catch (e) {
+                return console.log('loginFunc: No proper response received'); // error in the above string (in this case, yes)!
             }
-            // // if (electron.app.isQuitting) {
-            // //  return
-            // // }
-            // e.preventDefault()
-            // mainWindow.hide()
-            // // if (child.isVisible()) {
-            // //     child.hide()
-            // //   } 
-            // //mainWindow = null;
-           });
-          }
+           } 
         })
         response.on('end', () => {})
     })
@@ -2397,12 +2572,20 @@ ipcMain.on('check_email',function(e,form_data){
   request.on('response', (response) => {
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
-        var obj = JSON.parse(chunk);
-        if(obj.status == 'valid'){
-          e.reply('checked_email', obj.status);
-        }else if(obj.status == 'invalid'){
-          e.reply('checked_email', obj.status);
-        }
+         if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            if(obj.status == 'valid'){
+              e.reply('checked_email', obj.status);
+            }else if(obj.status == 'invalid'){
+              e.reply('checked_email', obj.status);
+            }
+          
+          } catch (e) {
+              return console.log('checkemail: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2425,12 +2608,20 @@ ipcMain.on('check_user_email',function(e,form_data){
   request.on('response', (response) => {
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
-        var obj = JSON.parse(chunk);
-        if(obj.status == 'valid'){
-          e.reply('checked_user_email', obj.status);
-        }else if(obj.status == 'invalid'){
-          e.reply('checked_user_email', obj.status);
-        }
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            if(obj.status == 'valid'){
+              e.reply('checked_user_email', obj.status);
+            }else if(obj.status == 'invalid'){
+              e.reply('checked_user_email', obj.status);
+            }
+            
+          } catch (e) {
+              return console.log('check_user_email: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2453,12 +2644,20 @@ ipcMain.on('check_member_email',function(e,form_data){
   request.on('response', (response) => {
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
-        var obj = JSON.parse(chunk);
-        if(obj.status == 'valid'){
-          e.reply('checked_member_email', obj);
-        }else if(obj.status == 'invalid'){
-          e.reply('checked_member_email', obj);
-        }
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            if(obj.status == 'valid'){
+              e.reply('checked_member_email', obj);
+            }else if(obj.status == 'invalid'){
+              e.reply('checked_member_email', obj);
+            }
+            
+          } catch (e) {
+              return console.log('checkmemberemail: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2494,98 +2693,112 @@ ipcMain.on('member_registration',function(e,form_data){
   request.on('response', (response) => {
      console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
-        var obj = JSON.parse(chunk);
-        console.log(obj);
-        if(obj.status == 'valid'){ 
-          global.clientID = obj.result;
-          global.userName = obj.loginPass[0];
-            global.loginid = obj.loginPass[1];
-            asset_id = obj.asset_maxid;
-            global.NetworkStatus = 'Yes';
-            global.assetID = asset_id;
-            global.sysKey = obj.sysKey;
-            updateAsset(asset_id);
-            //addAssetUtilisation(output.asset_maxid,output.result[0]);
-            const cookie = {url: 'http://www.eprompto.com', name: obj.sysKey , value: obj.sysKey, expirationDate:9999999999 }
-          session.defaultSession.cookies.set(cookie, (error) => {
-            if (error) console.error(error)
-          })
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            console.log(obj);
+            if(obj.status == 'valid'){ 
+              global.clientID = obj.result;
+              global.userName = obj.loginPass[0];
+                global.loginid = obj.loginPass[1];
+                asset_id = obj.asset_maxid;
+                global.NetworkStatus = 'Yes';
+                global.assetID = asset_id;
+                global.sysKey = obj.sysKey;
+               // updateAsset(asset_id);
+                softwareDetails();
+                hardwareDetails();
+                keyboardDetails();
+                mouseDetails();
+                graphicCardDetails();
+                motherboardDetails();
+                monitorDetails();
+                //addAssetUtilisation(output.asset_maxid,output.result[0]);
+                const cookie = {url: 'http://www.eprompto.com', name: obj.sysKey , value: obj.sysKey, expirationDate:9999999999 }
+              session.defaultSession.cookies.set(cookie, (error) => {
+                if (error) console.error(error)
+              })
 
-          fs.writeFile(detail, obj.sysKey, function (err) {
-            if (err) return console.log(err);
-          });
+              fs.writeFile(detail, obj.sysKey, function (err) {
+                if (err) return console.log(err);
+              });
 
-          global.deviceID = form_data['device_type'];
+              global.deviceID = form_data['device_type'];
 
-          mainWindow = new BrowserWindow({
-            width: 392,
-            height:520,
-            icon: __dirname + '/images/fav-icon.png',
-            frame: false,
-            x: width - 450,
-              y: 190,
-            webPreferences: {
-                  nodeIntegration: true,
-                  enableRemoteModule: true,
-              },
-             // skipTaskbar: true  
-          });
-          
-          mainWindow.setMenuBarVisibility(false);
-       //  mainWindow.hide();
-          mainWindow.loadURL(url.format({
-            pathname: path.join(__dirname,'index.html'),
-            protocol: 'file:',
-            slashes: true
-          }));
-
-          child = new BrowserWindow({ 
-            parent: mainWindow,
-            icon: __dirname + '/images/fav-icon.png', 
-            modal: true, 
-            show: true,
-            width: 380,
-            height: 100,
-            frame: false,
-            x: width - 450,
-                y: 190,
-            webPreferences: {
-                    nodeIntegration: true,
-                    enableRemoteModule: true,
-                },
-               // skipTaskbar: true  
-          });
-          
-          child.setMenuBarVisibility(false);
-          
-          child.loadURL(url.format({
-            pathname: path.join(__dirname,'modal.html'),
-            protocol: 'file:',
-            slashes: true
-          }));
-          child.once('ready-to-show', () => {
-            child.show()
-          });
+              mainWindow = new BrowserWindow({
+                width: 392,
+                height:520,
+                icon: __dirname + '/images/fav-icon.png',
+                frame: false,
+                x: width - 450,
+                  y: 190,
+                webPreferences: {
+                      nodeIntegration: true,
+                      enableRemoteModule: true,
+                  },
+                // skipTaskbar: true  
+              });
               
-          regWindow.close();
-         
-          tray.on('click', function(e){
-              if (mainWindow.isVisible()) {
-                mainWindow.hide()
-              } else {
-                mainWindow.hide()
-              }
-          });
-         
-          mainWindow.on('close', function (e) {
-            if (process.platform !== "darwin") {
-              app.quit();
+              mainWindow.setMenuBarVisibility(false);
+          //  mainWindow.hide();
+              mainWindow.loadURL(url.format({
+                pathname: path.join(__dirname,'index.html'),
+                protocol: 'file:',
+                slashes: true
+              }));
+
+              child = new BrowserWindow({ 
+                parent: mainWindow,
+                icon: __dirname + '/images/fav-icon.png', 
+                modal: true, 
+                show: true,
+                width: 380,
+                height: 100,
+                frame: false,
+                x: width - 450,
+                    y: 190,
+                webPreferences: {
+                        nodeIntegration: true,
+                        enableRemoteModule: true,
+                    },
+                  // skipTaskbar: true  
+              });
+              
+              child.setMenuBarVisibility(false);
+              
+              child.loadURL(url.format({
+                pathname: path.join(__dirname,'modal.html'),
+                protocol: 'file:',
+                slashes: true
+              }));
+              child.once('ready-to-show', () => {
+                child.show()
+              });
+                  
+              regWindow.close();
+            
+              tray.on('click', function(e){
+                  if (mainWindow.isVisible()) {
+                    mainWindow.hide()
+                  } else {
+                    mainWindow.hide()
+                  }
+              });
+            
+              mainWindow.on('close', function (e) {
+                if (process.platform !== "darwin") {
+                  app.quit();
+                }
+              });
+            }else if(obj.status == 'wrong_otp'){
+              e.reply('otp_message', 'OTP entered is wrong');
             }
-          });
-        }else if(obj.status == 'wrong_otp'){
-          e.reply('otp_message', 'OTP entered is wrong');
-        }
-     
+            
+          } catch (e) {
+              return console.log('member_register: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2634,8 +2847,16 @@ ipcMain.on('sendOTP',function(e,form_data){
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
         //console.log(`${chunk}`);
-        var obj = JSON.parse(chunk);
-        e.reply('sendOTP_status', obj.status);
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            e.reply('sendOTP_status', obj.status);
+           
+          } catch (e) {
+              return console.log('sendOTP: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2769,10 +2990,18 @@ ipcMain.on('update_is_itam_policy',function(e,form_data){
       //console.log(`STATUS: ${response.statusCode}`)
       response.on('data', (chunk) => {
         //console.log(`${chunk}`);
-        var obj = JSON.parse(chunk);
-        if(obj.status == 'invalid'){
-          log.info('Error occured on updating itam policy');
-        }
+        
+        if (chunk) {
+          let a;
+          try {
+            var obj = JSON.parse(chunk);
+            if(obj.status == 'invalid'){
+              log.info('Error occured on updating itam policy');
+            }
+          } catch (e) {
+              return console.log('update_itam_policy: No proper response received'); // error in the above string (in this case, yes)!
+          }
+         } 
       })
       response.on('end', () => {})
   })
@@ -2816,7 +3045,7 @@ autoUpdater.on('update-available', () => {
 autoUpdater.on('update-downloaded', () => {
   notifier.notify(
     {
-      title: 'Version 1.0.3 Released. Click to Restart Application.', //put version number of future release. not current.
+      title: 'Update Available.', //put version number of future release. not current.
       message: 'It will be Updated on Application Restart.',
       icon: path.join(app.getAppPath(), '/images/fav-icon.png'),
       sound: true,
@@ -2896,138 +3125,146 @@ ipcMain.on('Preventive_Maintenance_Main',function(e,form_data,pm_type) {
             
             response.on('data', (chunk) => {
               console.log(`${chunk}`);         // comment out
-              var obj = JSON.parse(chunk);
-              if(obj.status == 'valid'){
-                
-                if (obj.result.script_type == 'Simple'){
-                  global.stdoutputArray = [];
-
-                  if (chunk.includes(obj.result.process_name))
-                  {
-                    if(obj.result.script_id == 15)  
-                        {
-                            var filepath = "C:/ITAMEssential/lock_call.txt";// you need to save the filepath when you open the file to update without use the filechooser dialog againg
-                            var content = "is_locked_req = yes";
-                      
-                            fs.writeFile(filepath, content, (err) => {
-                                if (err) {
-                                    console.log("An error ocurred updating the file :" + err.message);
-                                    console.log(err);
-                                    return;
-                                }
-                                console.log("The file has been succesfully saved");
-                                
-                            });
-                        }
-                        if(obj.result.script_id == 16)  
-                        {
-                            var filepath = "C:/ITAMEssential/lock_call.txt";// you need to save the filepath when you open the file to update without use the filechooser dialog againg
-                            var content = "is_locked_req = no";
-                      
-                            fs.writeFile(filepath, content, (err) => {
-                                if (err) {
-                                    console.log("An error ocurred updating the file :" + err.message);
-                                    console.log(err);
-                                    return;
-                                }
-                                console.log("The file has been succesfully saved");
-                                
-                            });
-                        }
-                    exec(obj.result.script_path, function(error, stdout, stderr) // works properly
-                      {  
-                        
-                        const output_data = [];
-                        output_data['activity_id']  = obj.result.activity_id;
-                        output_data['asset_id']     = obj.result.asset_id;
-                        output_data['script_id']    = obj.result.script_id;
-                        // output_data['login_user']   = obj.result.login_user;
-                        output_data['maintenance_id'] = obj.result.maintenance_id;
-                        console.log(output_data);
-                        if (error) {
-                          console.log("error");
-                          output_data['script_status'] = 'Failed';
-                          output_data['script_remark'] = 'Failed to perform Maintainance Activity on this device.';
-                          output_data['result_data']   = error; 
-                          updatePreventiveMaintenance(output_data);
-                          return;
-                        };
-
-                        global.stdoutputArray.push(stdout);
-
-                        output_data['script_status'] = 'Completed';
-                        output_data['script_remark'] = 'Maintainance Activity Performed Successfully on this device';
-                        output_data['result_data']   = global.stdoutputArray; 
-                        updatePreventiveMaintenance(output_data);
-                      });
-
-                      // console.log(global.stdoutputArray);
-                      // UnArray = global.stdoutputArray[0];
-                      // console.log(UnArray);
-                      // console.log(stdoutputArray);
-                      // updatePreventiveMaintenance(global.stdoutputArray); // stdoutputArray has all the outputs. They'll be sent to Send_PM_StdOutput to be uploaded
-
+              if (chunk) {
+                let a;
+                try {
+                  var obj = JSON.parse(chunk);
+                  if(obj.status == 'valid'){
+                    
+                    if (obj.result.script_type == 'Simple'){
+                      global.stdoutputArray = [];
+    
+                      if (chunk.includes(obj.result.process_name))
+                      {
+                        if(obj.result.script_id == 15)  
+                            {
+                                var filepath = "C:/ITAMEssential/lock_call.txt";// you need to save the filepath when you open the file to update without use the filechooser dialog againg
+                                var content = "is_locked_req = yes";
+                          
+                                fs.writeFile(filepath, content, (err) => {
+                                    if (err) {
+                                        console.log("An error ocurred updating the file :" + err.message);
+                                        console.log(err);
+                                        return;
+                                    }
+                                    console.log("The file has been succesfully saved");
+                                    
+                                });
+                            }
+                            if(obj.result.script_id == 16)  
+                            {
+                                var filepath = "C:/ITAMEssential/lock_call.txt";// you need to save the filepath when you open the file to update without use the filechooser dialog againg
+                                var content = "is_locked_req = no";
+                          
+                                fs.writeFile(filepath, content, (err) => {
+                                    if (err) {
+                                        console.log("An error ocurred updating the file :" + err.message);
+                                        console.log(err);
+                                        return;
+                                    }
+                                    console.log("The file has been succesfully saved");
+                                    
+                                });
+                            }
+                        exec(obj.result.script_path, function(error, stdout, stderr) // works properly
+                          {  
+                            
+                            const output_data = [];
+                            output_data['activity_id']  = obj.result.activity_id;
+                            output_data['asset_id']     = obj.result.asset_id;
+                            output_data['script_id']    = obj.result.script_id;
+                            // output_data['login_user']   = obj.result.login_user;
+                            output_data['maintenance_id'] = obj.result.maintenance_id;
+                            console.log(output_data);
+                            if (error) {
+                              console.log("error");
+                              output_data['script_status'] = 'Failed';
+                              output_data['script_remark'] = 'Failed to perform Maintainance Activity on this device.';
+                              output_data['result_data']   = error; 
+                              updatePreventiveMaintenance(output_data);
+                              return;
+                            };
+    
+                            global.stdoutputArray.push(stdout);
+    
+                            output_data['script_status'] = 'Completed';
+                            output_data['script_remark'] = 'Maintainance Activity Performed Successfully on this device';
+                            output_data['result_data']   = global.stdoutputArray; 
+                            updatePreventiveMaintenance(output_data);
+                          });
+    
+                          // console.log(global.stdoutputArray);
+                          // UnArray = global.stdoutputArray[0];
+                          // console.log(UnArray);
+                          // console.log(stdoutputArray);
+                          // updatePreventiveMaintenance(global.stdoutputArray); // stdoutputArray has all the outputs. They'll be sent to Send_PM_StdOutput to be uploaded
+    
+                      }
+                    }
+                    
+                    const output_data = [];
+                    output_data['activity_id'] = obj.result.activity_id;
+                    output_data['asset_id']    = obj.result.asset_id;
+                    output_data['script_id']   = obj.result.script_id
+                    output_data['maintenance_id'] = obj.result.maintenance_id;
+                    output_data['login_user']   = obj.result.login_user;
+                    output_data['script_status'] = "Completed";
+                    output_data['script_remark'] = 'Maintainance Activity Performed Successfully on this device';
+                    
+    
+                    // Complex Bat Scripts
+                    if (chunk.includes("Browser Cache"))
+                    {                                              
+                      Preventive_Maintenance_Complex_Scripts('Browser Cache', output_data);
+                    }
+                    if (chunk.includes('Windows Cache'))
+                    {                            
+                      Preventive_Maintenance_Complex_Scripts('Windows Cache', output_data);          
+                    }                
+                    if (chunk.includes('Force Change Password'))
+                    {                            
+                      Preventive_Maintenance_Complex_Scripts('Force Change Password', output_data);
+                    }
+                    if (chunk.includes('Enable Password Expiry'))
+                    {                            
+                      Preventive_Maintenance_Complex_Scripts('Enable Password Expiry', output_data);
+                    }
+                    if (chunk.includes('Disable Password Expiry'))
+                    {                            
+                      Preventive_Maintenance_Complex_Scripts('Disable Password Expiry', output_data);
+                    }
+    
+                    // Powershell Scripts:
+                    if (chunk.includes('Security Log'))
+                    {                            
+                      Preventive_Maintenance_Powershell_Scripts('Security Log', output_data);                                
+                    }
+                    if (chunk.includes('Antivirus Details'))
+                    {                            
+                      Preventive_Maintenance_Powershell_Scripts('Antivirus Details', output_data);                             
+                    }                                
+                    if (chunk.includes('Bit Locker'))
+                    {                            
+                      Preventive_Maintenance_Powershell_Scripts('Bit Locker', output_data);
+                    }
+                    if (chunk.includes('Windows Update'))
+                    {                            
+                      Preventive_Maintenance_Powershell_Scripts('Windows Update', output_data);                             
+                    }                                
+                    if (chunk.includes('Enable USB Ports'))
+                    {                            
+                      Preventive_Maintenance_Powershell_Scripts('Enable USB Ports', output_data);
+                    }
+                    if (chunk.includes('Disable USB Ports'))
+                    {                            
+                      Preventive_Maintenance_Powershell_Scripts('Disable USB Ports', output_data);
+                    }
                   }
+                  
+                } catch (e) {
+                    return console.log('getPreventiveMaintenanceList: No proper response received'); // error in the above string (in this case, yes)!
                 }
-                
-                const output_data = [];
-                output_data['activity_id'] = obj.result.activity_id;
-                output_data['asset_id']    = obj.result.asset_id;
-                output_data['script_id']   = obj.result.script_id
-                output_data['maintenance_id'] = obj.result.maintenance_id;
-                output_data['login_user']   = obj.result.login_user;
-                output_data['script_status'] = "Completed";
-                output_data['script_remark'] = 'Maintainance Activity Performed Successfully on this device';
-                
-
-                // Complex Bat Scripts
-                if (chunk.includes("Browser Cache"))
-                {                                              
-                  Preventive_Maintenance_Complex_Scripts('Browser Cache', output_data);
-                }
-                if (chunk.includes('Windows Cache'))
-                {                            
-                  Preventive_Maintenance_Complex_Scripts('Windows Cache', output_data);          
-                }                
-                if (chunk.includes('Force Change Password'))
-                {                            
-                  Preventive_Maintenance_Complex_Scripts('Force Change Password', output_data);
-                }
-                if (chunk.includes('Enable Password Expiry'))
-                {                            
-                  Preventive_Maintenance_Complex_Scripts('Enable Password Expiry', output_data);
-                }
-                if (chunk.includes('Disable Password Expiry'))
-                {                            
-                  Preventive_Maintenance_Complex_Scripts('Disable Password Expiry', output_data);
-                }
-
-                // Powershell Scripts:
-                if (chunk.includes('Security Log'))
-                {                            
-                  Preventive_Maintenance_Powershell_Scripts('Security Log', output_data);                                
-                }
-                if (chunk.includes('Antivirus Details'))
-                {                            
-                  Preventive_Maintenance_Powershell_Scripts('Antivirus Details', output_data);                             
-                }                                
-                if (chunk.includes('Bit Locker'))
-                {                            
-                  Preventive_Maintenance_Powershell_Scripts('Bit Locker', output_data);
-                }
-                if (chunk.includes('Windows Update'))
-                {                            
-                  Preventive_Maintenance_Powershell_Scripts('Windows Update', output_data);                             
-                }                                
-                if (chunk.includes('Enable USB Ports'))
-                {                            
-                  Preventive_Maintenance_Powershell_Scripts('Enable USB Ports', output_data);
-                }
-                if (chunk.includes('Disable USB Ports'))
-                {                            
-                  Preventive_Maintenance_Powershell_Scripts('Disable USB Ports', output_data);
-                }
-              }
+               } 
             })
             response.on('end', () => {});
         })
@@ -4040,14 +4277,22 @@ ipcMain.on('get_company_logo',function(e,form_data){
             //console.log(`STATUS: ${response.statusCode}`)
             response.on('data', (chunk) => {
               console.log(`${chunk}`);
-              var obj = JSON.parse(chunk);
-              console.log(obj);
-             
-              if(obj.status == 'valid'){
-                e.reply('checked_company_logo', obj.result);
-              }else if(obj.status == 'invalid'){
-                e.reply('checked_company_logo', obj.result);
-              }
+              if (chunk) {
+                let a;
+                try {
+                  var obj = JSON.parse(chunk);
+                  console.log(obj);
+                 
+                  if(obj.status == 'valid'){
+                    e.reply('checked_company_logo', obj.result,server_url);
+                  }else if(obj.status == 'invalid'){
+                    e.reply('checked_company_logo', obj.result,server_url);
+                  }
+                  
+                } catch (e) {
+                    return console.log('get_company_logo: No proper response received'); // error in the above string (in this case, yes)!
+                }
+               } 
             })
             response.on('end', () => {})
         })
@@ -4093,41 +4338,50 @@ ipcMain.on('Patch_Management_Main',function(e,form_data,pm_type) {
                   
                   response.on('data', (chunk) => {
                     console.log(`${chunk}`);         // comment out
-                    var obj = JSON.parse(chunk);
-                    if(obj.status == 'valid'){              
-                      
-                      const output_data = []; 
-                      output_data['management_id'] = obj.result.management_id;
-                      output_data['patch_management_type']   = obj.result.patch_management_type;             
-                      output_data['login_user']   = obj.result.login_user;
-                            
-
-                      // To Powershell Scripts
-                      if (obj.result.patch_management_type == 'Gap Analysis')
-                      {                         
-                        Patch_Management_Scripts('Last Installed Windows Update', output_data);                             
-                      }                                
-
-                      if (obj.result.patch_management_type == 'Gap Analysis')
-                      {                            
-                        Patch_Management_Scripts('Available Pending Updates', output_data);                             
-                      }                                
-
-                      if (chunk.includes('Quick Update')) // Including optional drivers updates
-                      {                            
-                        Patch_Management_Scripts('Install_All_Updates_Available', output_data);                             
-                      }                                
-
-                      if (chunk.includes('Install_Specific_Updates'))
-                      {                            
-                        Patch_Management_Scripts('Install_Specific_Updates', output_data);                             
-                      }                                
-
-                      if (chunk.includes('Uninstall_Updates'))
-                      {                            
-                        Patch_Management_Scripts('Uninstall_Updates', output_data);                             
-                      }                                
-                    }
+                   
+                    if (chunk) {
+                      let a;
+                      try {
+                        var obj = JSON.parse(chunk);
+                        if(obj.status == 'valid'){              
+                          
+                          const output_data = []; 
+                          output_data['management_id'] = obj.result.management_id;
+                          output_data['patch_management_type']   = obj.result.patch_management_type;             
+                          output_data['login_user']   = obj.result.login_user;
+                                
+    
+                          // To Powershell Scripts
+                          if (obj.result.patch_management_type == 'Gap Analysis')
+                          {                         
+                            Patch_Management_Scripts('Last Installed Windows Update', output_data);                             
+                          }                                
+    
+                          if (obj.result.patch_management_type == 'Gap Analysis')
+                          {                            
+                            Patch_Management_Scripts('Available Pending Updates', output_data);                             
+                          }                                
+    
+                          if (chunk.includes('Quick Update')) // Including optional drivers updates
+                          {                            
+                            Patch_Management_Scripts('Install_All_Updates_Available', output_data);                             
+                          }                                
+    
+                          if (chunk.includes('Install_Specific_Updates'))
+                          {                            
+                            Patch_Management_Scripts('Install_Specific_Updates', output_data);                             
+                          }                                
+    
+                          if (chunk.includes('Uninstall_Updates'))
+                          {                            
+                            Patch_Management_Scripts('Uninstall_Updates', output_data);                             
+                          }                                
+                        }
+                        
+                      } catch (e) {
+                          return console.log('getPatchManagementList: No proper response received'); // error in the above string (in this case, yes)!
+                      }
+                     } 
                   })
                   response.on('end', () => {});
               })
@@ -4147,3 +4401,726 @@ ipcMain.on('Patch_Management_Main',function(e,form_data,pm_type) {
     };
     });
 })
+// ------------------------Check Hardware Change Code Strat Here ------------------------------------------------------------------------
+ipcMain.on('check_hardware_changes',function(e) { 
+  hardwareDetails();
+ });
+
+ function hardwareDetails(called_type = '')
+ {
+  require('dns').resolve('www.google.com', function(err) {
+    console.log('Inside Check Hardware Call');
+    if (err) {
+        console.log("No connection");
+     } else {
+       session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+       .then((cookies) => {
+       if(cookies.length > 0){
+         console.log("Inside Check Hardware Cookies");
+         system_ip = ip.address();
+         var system_ip = ip.address();
+          RAM = (os.totalmem()/(1024*1024*1024)).toFixed(1)+' GB';
+          const disks = nodeDiskInfo.getDiskInfoSync();
+          hdd_total = 0;
+          
+          for (const disk of disks) {
+              if(disk.filesystem == 'Local Fixed Disk'){
+                hdd_total = hdd_total + disk.blocks;
+              }
+          }
+          
+          hdd_total = hdd_total/(1024*1024*1024)+' GB';
+          
+           si.osInfo(function(data) {
+             os_release = data.kernel;
+               os_bit_type = data.arch;
+               os_serial = data.serial;
+               os_version = data.release;
+               os_name = data.distro;
+               os_OEM = data.codename;
+       
+               os_data = os_name+' '+os_OEM+' '+os_bit_type+' '+os_version;
+       
+               exec('wmic path SoftwareLicensingService get OA3xOriginalProductKey', function(err, stdout, stderr) {
+                 if (stderr || err ) {    
+                    var product_key='';
+                 }
+                 else{
+                   res = stdout.split('\n'); 
+                   var ctr=0;
+                   var product_key='';
+                   res.forEach(function(line) {
+                     ctr = Number(ctr)+Number(1);
+                     line = line.trim();
+                     var newStr = line.replace(/  +/g, ' ');
+                     var parts = line.split(/  +/g);
+                     if(ctr == 2){
+                       product_key = parts;
+                     }
+                   });
+                 }
+                        
+                      
+       
+                si.bios(function(data) {
+                 bios_name = data.vendor;
+                 bios_version = data.bios_version;
+                 bios_released = data.releaseDate;
+             
+             
+           
+               si.cpu(function(data) {
+                 processor_OEM = data.vendor;
+                 processor_speed_ghz = data.speed;
+                 processor_model = data.brand;
+               
+               
+           
+               si.system(function(data) {
+                 sys_OEM = data.manufacturer;
+                   sys_model = data.model;
+                   device_name = os.hostname();
+                   cpuCount = os.cpus().length;
+                   itam_version = app.getVersion();
+                       
+                   
+               serialNumber(function (err, value) {
+             
+               getAntivirus(function(antivirus_data){  
+                 console.log('sys_key: '+cookies[0].name);
+                 console.log('version: '+os_data); 
+                 console.log('license_key: '+product_key);
+                 console.log('biosname: '+bios_name);
+                 console.log('sys_ip: '+system_ip);
+                 console.log('serialNo: '+bios_version);
+                 console.log('biosDate: '+bios_released);
+                 console.log('processor: '+processor_OEM);
+                 console.log('brand: '+processor_model);
+                 console.log('speed: '+processor_speed_ghz);
+                 console.log('make: '+sys_OEM);
+                 console.log('model: '+sys_model);
+                 console.log('device_name: '+device_name);
+                 console.log('cpu_count: '+cpuCount);
+                 console.log('itamVersion: '+ itam_version);
+                 console.log('serial_num: '+value);
+                 if(called_type == 'first')
+                 {
+                    var funcType = 'update_hardware_data';
+                 }
+                 else{
+                  var funcType = 'get_hardware_list';
+                 }
+                 var body = JSON.stringify({ 'funcType' : funcType, "sys_key": cookies[0].name, 'version': os_data, "license_key": product_key, "biosname": bios_name, "biosDate": bios_released, "sys_ip": system_ip, "serialNo": bios_version, "processor": processor_OEM, "brand": processor_model, "make": sys_OEM, "model": sys_model, "device_name": device_name, "cpu_count": cpuCount, "itamVersion": itam_version, "antivirus_data": antivirus_data, "serial_num": value, "speed": processor_speed_ghz, "ram": RAM, "hdd_capacity" : hdd_total }); 
+                 
+                 const request = net.request({ 
+                     method: 'POST', 
+                     url: root_url+'/hardware_list.php' 
+                 }); 
+                 request.on('response', (response) => {
+               // console.log(response);
+                   response.on('data', (chunk) => {
+                   console.log(`${chunk}`);         // comment out
+                    
+                         
+                     })
+                         response.on('end', () => {})
+                     })
+                     request.on('error', (error) => { 
+                         console.log(`ERROR: ${(error)}`) 
+                     })
+                     request.setHeader('Content-Type', 'application/json'); 
+                     request.write(body, 'utf-8'); 
+                     request.end();
+                     
+             
+                   });
+               
+               });
+             });
+           });
+         });
+       
+   });
+ 
+ });
+         
+     }
+   });
+ };
+ });
+}
+
+//--------------------- Check Hardware Change Code End Here ------------------------------------------------------------------------
+
+
+// ------------------------Check Software Change Code Strat Here ------------------------------------------------------------------------
+ipcMain.on('check_software_changes',function(e) { 
+  softwareDetails();
+});
+
+function softwareDetails()
+{
+  require('dns').resolve('www.google.com', function(err) {
+    console.log('Inside Check Software Call');
+    if (err) {
+        console.log("No connection");
+     } else {
+       session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+       .then((cookies) => {
+       if(cookies.length > 0){
+         console.log("Inside Check Software Cookies");
+        
+         exec('Get-ItemProperty -Path "HKLM:\\Software\\WOW6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*", "HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*", "HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*" | where { $_.DisplayName -ne $null } | Select-Object DisplayName, DisplayVersion, InstallDate | Sort DisplayName',{'shell':'powershell.exe'}, (error, stdout, stderr) => {
+           if (error) {
+             console.error(`exec error: ${error}`);
+             return;
+           }
+           
+           var app_list = [];
+           var version ="";
+           var i=0;
+           res = stdout.split('\n'); 
+          //  console.log(res);
+           version = '[';
+           res.forEach(function(line) {
+             i=Number(i)+Number(1);
+              line = line.trim();
+              //var newStr = line.replace(/  +/g, ' ');
+             var parts = line.split(/  +/g);
+            
+              if(parts.length >= 3)
+              {
+                 if(parts[0] != 'DisplayName' && parts[0] != '-----------' && parts[0] != '' && parts[1] != 'DisplayVersion' && parts[2] != 'InstallDate'){
+                   version += '{"name":"'+parts[0]+'","version":"'+parts[1]+'","install_date":"'+parts[2]+'"},';
+                 }
+               }
+               else if(parts.length == 2)
+               {
+                //if part 1 contains . in string then it is version otherwise it is installation date
+                if(parts[1].indexOf(".") !== -1)    
+                {
+                    version += '{"name":"'+parts[0]+'","version":"'+parts[1]+'","install_date":"--"},';
+                }
+                else
+                {
+                  var result = Math.floor(parts[1])
+                //  console.log(result);
+                  if(result)
+                  {
+                    //              
+                    version += '{"name":"'+parts[0]+'","version":"--","install_date":"'+parts[1]+'"},';                               
+                  }
+                  else
+                      version += '{"name":"'+parts[0]+'","version":"'+parts[1]+'","install_date":"--"},';
+                }
+               }
+              
+             
+           });
+           version += '{}]';  // console.log(version);
+        // var output = JSON.stringify(version);
+          // output = JSON.parse(output);
+           //console.log(output);
+          var output = version;
+         console.log(output);
+           require('dns').resolve('www.google.com', function(err) {
+           if (err) {
+              console.log("No connection");
+           } else {
+            var body = JSON.stringify({ "funcType": 'softwareList', "sys_key": cookies[0].name, "result": output }); 
+             const request = net.request({ 
+                 method: 'POST', 
+                 url: root_url+'/asset.php' 
+             }); 
+             console.log("here");
+             request.on('response', (response) => {
+                
+                 console.log(`STATUS: ${response.statusCode}`)
+                //console.log(response);
+                 response.on('data', (chunk) => {
+                  console.log(`${chunk}`);
+                 })
+                 response.on('end', () => {})
+                 console.log("hhh222");
+             })
+             request.on('error', (error) => { 
+                 console.log(`ERROR: ${(error)}`) 
+             })
+             request.setHeader('Content-Type', 'application/json'); 
+             request.write(body, 'utf-8'); 
+             request.end();
+           }
+         });
+       });
+     }
+   });
+ };
+ });
+}
+
+
+//--------------------- Check Software Change Code End Here ------------------------------------------------------------------------
+//----------------------Code for keyboard details Start Here--------------------------------------------------------------------
+
+ipcMain.on('check_keyboard_changes', function(e) 
+{
+   keyboardDetails();   
+ });
+
+ function keyboardDetails()
+ {
+  keyboardContent = "Get-WmiObject -Class Win32_Keyboard | Select-Object -ExpandProperty Description";
+  const path1 = 'C:/ITAMEssential/keyboard_details.ps1';
+  require('dns').resolve('www.google.com', function(err) {
+    console.log('Inside keyboard changes Call');
+     if (err) {
+        console.log("No connection");
+     } else {
+       session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+       .then((cookies) => {
+       if(cookies.length > 0){
+         console.log("Inside keyboard changes Cookies");
+          fs.writeFile(path1, keyboardContent, function (err) {
+            if (err){
+              throw err;
+            }
+            else
+            {
+                 var split_data = [];
+                 console.log('Keyboard Powershell Script File Created');
+                  // Execute bat file part:
+                  child = spawn("powershell.exe",["C:\\ITAMEssential\\keyboard_details.ps1"]);
+                  child.stdout.on("data",function(data)
+                  {
+                        console.log("Powershell Data: " + data);
+                        split_data.push(data);
+                  });
+                  child.on("exit",function()
+                  {
+                    console.log("Keyboard Ps1 executed");
+                     updateKeyboardName(split_data,cookies[0].name);
+                    child.stdin.end(); //end input
+                  });
+           }
+          });
+       }
+    });
+  }  
+  });  
+ }
+
+ function updateKeyboardName(data,sys_key){
+  console.log("Inside updateKeyboardName function");
+  console.log("updateKeyboardName "+data);
+ 
+  keyboardName = data.toString('utf8'); 
+ 
+  var finalKeyboardData = [];
+  var letters = [].concat.apply([],data.map(function(v){ 
+   return v.toString().split('\r\n');
+  }));
+  
+ 
+  console.log("Hw");
+ 
+  
+  finalKeyboardData = letters.filter((str) => str != '' && str != ' ');
+  console.log(finalKeyboardData);
+  
+ 
+  var body = JSON.stringify({ "funcType": 'updateKeyboardName',
+                              "keyboard_name" : finalKeyboardData,
+                              "sys_key": sys_key,                                                       
+                            }); 
+  const request = net.request({ 
+      method: 'POST', 
+      url: root_url+'/hardware_list.php' 
+  }); 
+  request.on('response', (response) => {
+      // console.log(response);
+      //console.log(`STATUS: ${response.statusCode}`)
+      response.on('data', (chunk) => {
+        console.log(`${chunk}`);   
+         console.log(chunk);
+      })
+      response.on('end', () => {        
+      });
+  })
+  request.on('error', (error) => { 
+      log.info('Error while updating Keyboard Name outputs '+`${(error)}`) 
+  })
+  request.setHeader('Content-Type', 'application/json'); 
+  request.write(body, 'utf-8'); 
+  request.end();
+
+};
+//----------------------Code for keyboard details Start Here--------------------------------------------------------------------
+
+//----------------------Code for Mouse details Start Here--------------------------------------------------------------------
+ipcMain.on('check_mouse_changes', function(e)
+{
+  console.log("check_mouse_changes");
+  mouseDetails();
+});
+
+function mouseDetails()
+{
+  mouseContent = "(Get-CimInstance win32_POINTINGDEVICE | select Name).Name";
+  const path1 = 'C:/ITAMEssential/mouse_details.ps1';
+
+  require('dns').resolve('www.google.com', function(err) {
+    console.log('Inside Mouse changes Call');
+    if (err) {
+        console.log("No connection");
+     } else {
+       session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+       .then((cookies) => {
+       if(cookies.length > 0){
+         console.log("Inside Mouse changes Cookies");
+       //  SetCron(cookies[0].name); 
+         console.log(cookies[0].name);
+ 
+         fs.writeFile(path1, mouseContent, function (err) 
+          {
+            if (err)
+            {
+              throw err;
+            }
+            else
+            {
+                  var split_data = [];
+                  console.log('Mouse Powershell Script File Created');
+                  // Execute bat file part:
+                  child = spawn("powershell.exe",["C:\\ITAMEssential\\mouse_details.ps1"]);
+                  child.stdout.on("data",function(data)
+                  {
+                    console.log("Powershell Data: " + data);
+                    split_data.push(data);
+                  });
+                  child.on("exit",function()
+                  {
+                    console.log("Mouse Ps1 executed");
+                    //console.log()
+                    updateMouseName(split_data,cookies[0].name);
+                    child.stdin.end(); //end input
+                  });                  
+                
+            }
+          });
+        }
+       });
+     }  
+    }); 
+}
+
+function updateMouseName(data,sys_key)
+{
+  console.log("Inside updateMouseName function");
+  console.log("Here Buffer");
+  
+  mouseName = data.toString('utf8'); 
+
+  var letters = [].concat.apply([],data.map(function(v){ 
+   return v.toString().split('\r\n');
+  }));
+  
+  mouseData = mouseName.split("\r\n"); // get mouse name in array format.
+  //Remove Empty string from Mouse Data
+  console.log("Hw");
+  finalMouseData = letters.filter((str) => str != '' && str != ' ');
+  console.log(finalMouseData);
+  var body = JSON.stringify({ "funcType": 'updateMouseName',
+                              "mouse_name" : finalMouseData,
+                              "sys_key": sys_key,                                                       
+                            }); 
+  const request = net.request({ 
+      method: 'POST', 
+      url: root_url+'/hardware_list.php' 
+  }); 
+  request.on('response', (response) => {
+      // console.log(response);
+      //console.log(`STATUS: ${response.statusCode}`)
+      response.on('data', (chunk) => {
+        console.log(`${chunk}`);   
+        // console.log(chunk);
+      })
+      response.on('end', () => {        
+      });
+  })
+  request.on('error', (error) => { 
+      log.info('Error while updating Mouse Name outputs '+`${(error)}`) 
+  })
+  request.setHeader('Content-Type', 'application/json'); 
+  request.write(body, 'utf-8'); 
+  request.end();
+
+};
+
+//----------------------Code for Mouse details End Here--------------------------------------------------------------------
+
+//----------------------Code for Graphic Card details Start Here--------------------------------------------------------------------
+
+ipcMain.on('check_graphic_card', function(e) 
+{
+   graphicCardDetails(); 
+ });
+
+ function graphicCardDetails()
+ {
+    graphicCard = "gwmi win32_VideoController | Select-Object -ExpandProperty Name";
+    const path1 = 'C:/ITAMEssential/graphic_card_details.ps1';
+    require('dns').resolve('www.google.com', function(err) {
+      console.log('Inside Graphic Card Call');
+      if (err) {
+          console.log("No connection");
+      } else {
+        session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+        .then((cookies) => {
+        if(cookies.length > 0){
+          console.log("Inside Graphic Card changes Cookies");
+            fs.writeFile(path1, graphicCard, function (err) {
+              if (err){
+                throw err;
+              }
+              else
+              {
+                  var split_data = [];
+                  console.log('Graphic Card Powershell Script File Created');
+                    // Execute bat file part:
+                    child = spawn("powershell.exe",["C:\\ITAMEssential\\graphic_card_details.ps1"]);
+                    child.stdout.on("data",function(data)
+                    {
+                          console.log("Powershell Data: " + data);
+                          split_data.push(data);
+                    });
+                    child.on("exit",function()
+                    {
+                      console.log("Graphic Card Ps1 executed");
+                      updateGraphicCard(split_data,cookies[0].name);
+                      child.stdin.end(); //end input
+                    });
+              }
+            });
+        }
+      });
+    }  
+    }); 
+ }
+
+ function updateGraphicCard(data,sys_key){
+  console.log("Inside updateGraphicCard function");
+  console.log("updateGraphicCard "+data);
+ 
+  graphicCardName = data.toString('utf8'); 
+ 
+  var finalGraphicCardData = [];
+  var letters = [].concat.apply([],data.map(function(v){ 
+   return v.toString().split('\r\n');
+  }));
+  
+ 
+  console.log("Hw");
+ 
+  
+  finalGraphicCardData = letters.filter((str) => str != '' && str != ' ');
+  console.log(finalGraphicCardData);
+  
+ 
+  var body = JSON.stringify({ "funcType": 'updateGraphicCard',
+                              "graphics_card" : finalGraphicCardData,
+                              "sys_key": sys_key,                                                       
+                            }); 
+  const request = net.request({ 
+      method: 'POST', 
+      url: root_url+'/hardware_list.php' 
+  }); 
+  request.on('response', (response) => {
+      // console.log(response);
+      //console.log(`STATUS: ${response.statusCode}`)
+      response.on('data', (chunk) => {
+        console.log(`${chunk}`);   
+         console.log(chunk);
+      })
+      response.on('end', () => {        
+      });
+  })
+  request.on('error', (error) => { 
+      log.info('Error while updating Graphics Card Name outputs '+`${(error)}`) 
+  })
+  request.setHeader('Content-Type', 'application/json'); 
+  request.write(body, 'utf-8'); 
+  request.end();
+
+};
+//----------------------Code for Graphic Card details Start Here--------------------------------------------------------------------
+
+//----------------------Code for Mother Board details Start Here--------------------------------------------------------------------
+ipcMain.on('check_motherboard_changes', function(e)
+{
+  console.log("check_motherboard_changes");
+ motherboardDetails();
+});
+
+function motherboardDetails()
+{
+  var motherboardData = "Get-CimInstance -Class Win32_BaseBoard | ft Product, Version -HideTableHeaders";
+  const path1 = 'C:/ITAMEssential/motherboard_details.ps1';
+
+  require('dns').resolve('www.google.com', function(err) {
+    console.log('Inside Motherboard changes Call');
+    if (err) {
+        console.log("No connection");
+     } else {
+       session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+       .then((cookies) => {
+       if(cookies.length > 0){
+         console.log("Inside Motherboard changes Cookies");
+       //  SetCron(cookies[0].name); 
+         console.log(cookies[0].name);
+ 
+         fs.writeFile(path1, motherboardData, function (err) 
+          {
+            if (err)
+            {
+              throw err;
+            }
+            else
+            {
+                  var split_data = [];
+                  console.log('Motherboard Powershell Script File Created');
+                  // Execute bat file part:
+                  child = spawn("powershell.exe",["C:\\ITAMEssential\\motherboard_details.ps1"]);
+                  child.stdout.on("data",function(data)
+                  {
+                    console.log("Powershell Data: " + data);
+                    split_data.push(data);
+                  });
+                  child.on("exit",function()
+                  {
+                    console.log("Motherboard Ps1 executed");
+                    //console.log()
+                    updateMotherboard(split_data,cookies[0].name);
+                    child.stdin.end(); //end input
+                  });                  
+                
+            }
+          });
+        }
+       });
+     }  
+    });  
+}
+
+function updateMotherboard(data,sys_key)
+{
+  console.log("Inside updateMotherboard function");
+  console.log("Here Buffer");
+
+  
+   motherBoard = data.toString('utf8');
+ 
+//   var finalMotherboardData = [];
+//   var letters = [].concat.apply([],data.map(function(v){ 
+//    return v.toString().split('\r\n');
+//   }));
+  
+//  //motherBoardData = motherBoard.split("\r\n"); 
+//   console.log("Hw");
+ 
+  
+//   finalMotherboardData = letters.filter((str) => str != '' && str != ' ');
+//   console.log(finalMotherboardData);
+
+ line = motherBoard.trim();
+//var newStr = line.replace(/  +/g, ' ');
+  var parts = line.split(/  +/g);
+  var product_name = parts[0];
+  var product_version = parts[1];
+  var product_name = product_name.replace(/(^,)|(,$)/g, "");
+ 
+  console.log('product_name'+product_name);
+  var body = JSON.stringify({ "funcType": 'updateMotherboardData',
+                              "motherboard_name" : product_name,
+                              "motherboard_version" : product_version,
+                              "sys_key": sys_key,                                                       
+                            }); 
+
+  const request = net.request({ 
+      method: 'POST', 
+      url: root_url+'/hardware_list.php' 
+  }); 
+  request.on('response', (response) => {
+      // console.log(response);
+      //console.log(`STATUS: ${response.statusCode}`)
+      response.on('data', (chunk) => {
+        console.log(`${chunk}`);   
+        // console.log(chunk);
+      })
+      response.on('end', () => {        
+      });
+  })
+  request.on('error', (error) => { 
+      log.info('Error while updating Motherboard Name outputs '+`${(error)}`) 
+  })
+  request.setHeader('Content-Type', 'application/json'); 
+  request.write(body, 'utf-8'); 
+  request.end();
+
+};
+
+//----------------------Code for Mother Board details End Here--------------------------------------------------------------------
+// --------------------- Code for Monitor Details Store Start Here ------------------------------------------------
+
+function monitorDetails()
+{
+  console.log("Inside monitorDetails function");
+  
+  display = electron.screen.getPrimaryDisplay();
+
+  // Display information
+  const displayInfo = {
+      name: display.name || 'Name not available',
+      bounds: display.bounds,
+      workArea: display.workArea,
+      scaleFactor: display.scaleFactor,
+      refreshRate: display.refreshRate || 'Refresh rate not available',
+      bitDepth: display.colorDepth,
+      orientation: display.size.width > display.size.height ? 'landscape' : 'portrait' || 'Orientation not available',
+      
+  };
+  
+  const size = display.size.width+' X '+display.size.height;
+  console.log(displayInfo);console.log(size);
+  session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+  .then((cookies) => {
+  if(cookies.length > 0){
+  var body = JSON.stringify({ "funcType": 'updateMonitorDetails',
+                              "displayInfo" : displayInfo,
+                              "displaySize" : size,
+                              "sys_key": cookies[0].name,                                                       
+                            }); 
+  const request = net.request({ 
+      method: 'POST', 
+      url: root_url+'/hardware_list.php' 
+  }); 
+  request.on('response', (response) => {
+      // console.log(response);
+      //console.log(`STATUS: ${response.statusCode}`)
+      response.on('data', (chunk) => {
+        console.log(`${chunk}`);   
+        // console.log(chunk);
+      })
+      response.on('end', () => {        
+      });
+  })
+  request.on('error', (error) => { 
+      log.info('Error while updating Monitor Details outputs '+`${(error)}`) 
+  })
+  request.setHeader('Content-Type', 'application/json'); 
+  request.write(body, 'utf-8'); 
+  request.end();
+}
+});
+
+};
+// --------------------- Code for Monitor Details Store End Here ------------------------------------------------
