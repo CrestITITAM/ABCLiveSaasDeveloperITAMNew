@@ -31,7 +31,7 @@ const { Console } = require('console');
 
 const Tray = electron.Tray;
 const iconPath = path.join(__dirname,'images/fav-icon.png');
-const versionItam = '1.0.6';
+const versionItam = '1.0.7';
 
 const chokidar = require('chokidar');
 const getmac = require('getmac');
@@ -787,7 +787,7 @@ function setGlobalVariable(){
         height: 520,
         icon: __dirname + '/images/fav-icon.png',
         //frame: false,
-        x: width - 450,
+        x: width - 430,
             y: 190,
         webPreferences: {
                 nodeIntegration: true,
@@ -3043,25 +3043,25 @@ autoUpdater.on('update-available', () => {
 // });
 
 autoUpdater.on('update-downloaded', () => {
-  notifier.notify(
-    {
-      title: 'Update Available.', //put version number of future release. not current.
-      message: 'It will be Updated on Application Restart.',
-      icon: path.join(app.getAppPath(), '/images/fav-icon.png'),
-      sound: true,
-      wait: true, 
-      appID: "Click to restart Application"
-    },
-    function (err, response, metadata) {
-      // console.log(response);
-      // console.log(err);
-      if(response == undefined){
-        console.log("auto updater quit and install function called.")
+  // notifier.notify(
+  //   {
+  //     title: 'Update Available.', //put version number of future release. not current.
+  //     message: 'It will be Updated on Application Restart.',
+  //     icon: path.join(app.getAppPath(), '/images/fav-icon.png'),
+  //     sound: true,
+  //     wait: true, 
+  //     appID: "Click to restart Application"
+  //   },
+  //   function (err, response, metadata) {
+  //     // console.log(response);
+  //     // console.log(err);
+  //     if(response == undefined){
+  //       console.log("auto updater quit and install function called.")
         autoUpdater.quitAndInstall();
-      }
+    //   }
   
-    }
-  );
+    //  }
+   //);
 
   // console.log(app.getVersion()); // temp
   // title:'ITAM Version'+AppVersionNumber+'Released. Click to Restart Application.'
