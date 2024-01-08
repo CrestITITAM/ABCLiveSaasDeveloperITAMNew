@@ -311,6 +311,7 @@
         });
 
          ipcRenderer.on('checked_member_email', (event, data) => { 
+          console.log('checked_member_email: '+data.status);
           if(data.status == 'invalid'){
             document.getElementById("err_member_email_id").innerText = 'Email Id does not exist';
             var vali_btn_err =  document.getElementById('btn_validate');

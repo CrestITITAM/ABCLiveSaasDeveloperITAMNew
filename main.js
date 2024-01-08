@@ -31,7 +31,7 @@ const { Console } = require('console');
 
 const Tray = electron.Tray;
 const iconPath = path.join(__dirname,'images/fav-icon.png');
-const versionItam = '1.0.7';
+const versionItam = '1.0.9';
 
 const chokidar = require('chokidar');
 const getmac = require('getmac');
@@ -51,6 +51,10 @@ const getmac = require('getmac');
 
 global.root_url = 'https://business.eprompto.com/itam_backend_end_user';
 server_url = 'https://business.eprompto.com';
+
+ //Local Url
+// global.root_url = 'http://localhost/business_eprompto/itam_backend_end_user';
+// server_url = 'http://localhost/business_eprompto';
 
 let reqPath = path.join(app.getAppPath(), '../');
 const detail =  reqPath+"syskey.txt";
@@ -673,6 +677,7 @@ function setGlobalVariable(){
                       graphicCardDetails();
                       motherboardDetails();
                       monitorDetails();
+                      monitorInchesScreen();
                       //SetCron(cookies[0].name);
                       //addAssetUtilisation(asset_id,client_id);
                     }
@@ -2339,6 +2344,7 @@ ipcMain.on('login_data',function(e,data){
                 graphicCardDetails();
                 motherboardDetails();
                 monitorDetails();
+                monitorInchesScreen();
                 //addAssetUtilisation(output.asset_maxid,output.result[0]);
                 global.deviceID = data.device_type;
       
@@ -2648,6 +2654,7 @@ ipcMain.on('check_member_email',function(e,form_data){
           let a;
           try {
             var obj = JSON.parse(chunk);
+            console.log(obj.sql);
             if(obj.status == 'valid'){
               e.reply('checked_member_email', obj);
             }else if(obj.status == 'invalid'){
@@ -2714,6 +2721,7 @@ ipcMain.on('member_registration',function(e,form_data){
                 graphicCardDetails();
                 motherboardDetails();
                 monitorDetails();
+                monitorInchesScreen();
                 //addAssetUtilisation(output.asset_maxid,output.result[0]);
                 const cookie = {url: 'http://www.eprompto.com', name: obj.sysKey , value: obj.sysKey, expirationDate:9999999999 }
               session.defaultSession.cookies.set(cookie, (error) => {
@@ -5070,7 +5078,11 @@ function updateMotherboard(data,sys_key)
 
 //----------------------Code for Mother Board details End Here--------------------------------------------------------------------
 // --------------------- Code for Monitor Details Store Start Here ------------------------------------------------
-
+ipcMain.on('check_monitor_resolution_size_changes', function(e)
+{
+  console.log("monitorDetails");
+  monitorDetails();
+});
 function monitorDetails()
 {
   console.log("Inside monitorDetails function");
@@ -5124,3 +5136,109 @@ function monitorDetails()
 
 };
 // --------------------- Code for Monitor Details Store End Here ------------------------------------------------
+
+// --------------------- Code for Monitor Screen In inches Store Start Here ------------------------------------------------
+ipcMain.on('check_monitor_screen_size_changes', function(e)
+{
+  console.log("check_monitor_screen_size_changes");
+  monitorInchesScreen();
+});
+
+function monitorInchesScreen()
+{
+  var motherboardInch = "(Get-WmiObject -Namespace root\\wmi -Class WmiMonitorBasicDisplayParams | select @{N='size'; E={[System.Math]::Round(([System.Math]::Sqrt([System.Math]::Pow($_.MaxHorizontalImageSize, 2) + [System.Math]::Pow($_.MaxVerticalImageSize, 2))/2.54),2)} }).size";
+  const path1 = 'C:/ITAMEssential/display_inches.ps1';
+
+  require('dns').resolve('www.google.com', function(err) {
+    console.log('Inside Monitor Inches Call');
+     if (err) {
+        console.log("No connection");
+     } else {
+       session.defaultSession.cookies.get({ url: 'http://www.eprompto.com' })
+       .then((cookies) => {
+       if(cookies.length > 0){
+       console.log(cookies[0].name);
+ 
+         fs.writeFile(path1, motherboardInch, function (err) 
+          {
+            if (err)
+            {
+              throw err;
+            }
+            else
+            {
+                  var split_data = [];
+                  console.log('Monitor Inches Powershell Script File Created');
+                  // Execute bat file part:
+                  child = spawn("powershell.exe",["C:\\ITAMEssential\\display_inches.ps1"]);
+                  child.stdout.on("data",function(data)
+                  {
+       //             console.log('++++++++++++++++++++++++++++++++++++++++++=');
+                    console.log("Powershell Data: " + data);
+                    split_data.push(data);
+                  });
+                  child.on("exit",function()
+                  {
+                    console.log("Monitor Inches Ps1 executed");
+                    console.log(split_data);
+                    updateMonitorInches(split_data,cookies[0].name);
+                    child.stdin.end(); //end input
+                  });                  
+                
+            }
+          });
+        }
+       });
+     }  
+    });  
+}
+
+function updateMonitorInches(data,sys_key)
+{
+  console.log("Inside updateMonitorInches function");
+  console.log("Here Buffer");
+
+  
+   monitorInches = data.toString('utf8');
+
+   var letters = [].concat.apply([],data.map(function(v){ 
+    return v.toString().split('\r\n');
+   }));
+   
+  
+   console.log("Hw");
+  
+   
+   monitorInches = letters.filter((str) => str != '' && str != ' ');
+   console.log('monitorInches======'+monitorInches);
+   display_inches = monitorInches+" inch";
+  console.log("monitorInches"+monitorInches);
+  
+  var body = JSON.stringify({ "funcType": 'updateMonitorInches',
+                              "display_inches" : display_inches,
+                              "sys_key": sys_key,                                                       
+                            }); 
+
+  const request = net.request({ 
+      method: 'POST', 
+      url: root_url+'/hardware_list.php' 
+  }); 
+  request.on('response', (response) => {
+      // console.log(response);
+      //console.log(`STATUS: ${response.statusCode}`)
+      response.on('data', (chunk) => {
+        console.log(`${chunk}`);   
+        // console.log(chunk);
+      })
+      response.on('end', () => {        
+      });
+  })
+  request.on('error', (error) => { 
+      log.info('Error while updating Motherboard Inches outputs '+`${(error)}`) 
+  })
+  request.setHeader('Content-Type', 'application/json'); 
+  request.write(body, 'utf-8'); 
+  request.end();
+
+};
+// --------------------- Code for Monitor Screen In inches Store End Here ------------------------------------------------
